@@ -1,6 +1,6 @@
 # Auto Close Tabs
 
-Automatically close inactive tabs after a configurable period. Keep your workspace clean by treating unpinned tabs as "fleeting"—inspired by the Fleeting Tabs feature in the Arc browser.
+Automatically close inactive tabs after a configurable period. Keep your workspace clean by treating unpinned tabs as "fleeting", inspired by the Fleeting Tabs feature in the Arc browser.
 
 **Current version: 1.0.0**
 
