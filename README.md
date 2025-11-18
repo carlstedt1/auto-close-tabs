@@ -1,94 +1,66 @@
-# Obsidian Sample Plugin
+# Auto Close Tabs
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+Automatically close inactive tabs after a configurable period. Keep your workspace clean by treating unpinned tabs as "fleeting"—inspired by the Fleeting Tabs feature in the Arc browser.
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+**Current version: 1.0.0**
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open Sample Modal" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+## ✨ Features
 
-## First time developing plugins?
+- **Auto-close inactive tabs**: Automatically closes tabs that haven't been touched for a set time (default: 1 day).
+- **Pinned tabs are safe**: Pinned tabs are never closed, making them "permanent."
+- **Configurable timeout**: Set your own inactivity threshold (e.g., 5 minutes or 2 hours).
+- **History logging**: Keep a log of all closed tabs to review what was cleaned up.
+  - View history in a modal.
+  - Export history to the developer console.
+  - Optionally write history to a markdown file in your vault (e.g., `system/auto-close-tabs-history.md`).
 
-Quick starting guide for new plugin devs:
+## 💡 Inspiration
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+This plugin was inspired by the **Fleeting Tabs** feature in the [Arc browser](https://arc.net/). 
 
-## Releasing new releases
+I tend to open tabs very freely, which leads to a cluttered workspace full of files I'm no longer using. I wanted a way to be deliberate about what stays open:
+- If I want to keep a file, I **pin** it.
+- If I don't pin it, it's **fleeting** and will disappear when I'm done with it.
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+This plugin brings that "fleeting" workflow to Obsidian, helping you keep your digital garden tidy automatically.
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+## 🚀 Installation
 
-## Adding your plugin to the community plugin list
+1. Open **Settings** → **Community plugins** in Obsidian.
+2. Search for **Auto Close Tabs**.
+3. Click **Install** and then **Enable**.
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+Alternatively, for manual installation:
+1. Copy `main.js`, `manifest.json`, and `styles.css` into `Vault/.obsidian/plugins/auto-close-tabs/`.
+2. Reload Obsidian and enable the plugin.
 
-## How to use
+## 🧭 Usage
 
-- Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
+1. **Pin important tabs**: Right-click a tab and select "Pin" (or use a hotkey) to keep it safe.
+2. **Let it run**: Work as usual. Tabs you leave unpinned will automatically close after they've been inactive for the configured time.
+3. **Review history**:
+   - Use the command palette (`Cmd/Ctrl + P`) and search for **"Auto Close Tabs: View closed tabs history"**.
+   - Or check the log file if you've enabled file logging.
 
-## Manually installing the plugin
+## ⚙️ Settings
 
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
+| Setting | Default | Description |
+| :--- | :--- | :--- |
+| **Enable auto-close** | On | Toggle the entire plugin on or off. |
+| **Inactive timeout** | 1440 min (1 day) | How many minutes a tab must be inactive before closing. |
+| **Check interval** | 60 sec | How often the plugin checks for inactive tabs. |
+| **Enable history logging** | On | Track closed tabs in an internal log. |
+| **Max history entries** | 1000 | Limit how many entries are kept in history. |
+| **Write to file** | Off | Also append closed tab logs to a specific markdown file. |
+| **Log file path** | `system/...` | The path to the log file (if "Write to file" is on). |
 
-## Improve code quality with eslint (optional)
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- To use eslint with this project, make sure to install eslint from terminal:
-  - `npm install -g eslint`
-- To use eslint to analyze this project use this command:
-  - `eslint main.ts`
-  - eslint will then create a report with suggestions for code improvement by file and line number.
-- If your source code is in a folder, such as `src`, you can use eslint with this command to analyze all files in that folder:
-  - `eslint ./src/`
+## 🪲 Troubleshooting
 
-## Funding URL
+- **"My tab closed while I was reading it!"**  
+  The plugin tracks *activity* (clicking, typing, scrolling). If you stare at a static page for longer than your timeout (e.g., 30 mins), it might close. Consider increasing your timeout or pinning reference material.
+- **"It's closing sidebars!"**  
+  Version 1.0.0+ explicitly ignores sidebar panels (like File Explorer or Search) and only closes actual editor tabs in the main workspace.
 
-You can include funding URLs where people who use your plugin can financially support it.
+## 🤝 Contributing
 
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
-
-```json
-{
-    "fundingUrl": "https://buymeacoffee.com"
-}
-```
-
-If you have multiple URLs, you can also do:
-
-```json
-{
-    "fundingUrl": {
-        "Buy Me a Coffee": "https://buymeacoffee.com",
-        "GitHub Sponsor": "https://github.com/sponsors",
-        "Patreon": "https://www.patreon.com/"
-    }
-}
-```
-
-## API Documentation
-
-See https://github.com/obsidianmd/obsidian-api
+Contributions are welcome! Please see [AGENTS.md](./AGENTS.md) for developer notes and build instructions.

@@ -17,7 +17,7 @@ export interface AutoCloseTabsSettings {
 
 export const DEFAULT_SETTINGS: AutoCloseTabsSettings = {
 	enabled: true,
-	inactiveTimeoutMinutes: 30,
+	inactiveTimeoutMinutes: 1440, // 24 hours
 	checkIntervalSeconds: 60,
 	logHistory: true,
 	logToFile: false,
