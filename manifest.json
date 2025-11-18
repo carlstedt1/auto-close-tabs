@@ -1,0 +1,9 @@
+{
+	"id": "auto-close-tabs",
+	"name": "Auto Close Tabs",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "Automatically closes inactive tabs after a configurable timeout.",
+	"author": "",
+	"isDesktopOnly": false
+}
