@@ -8,9 +8,9 @@ export default class AutoCloseTabsPlugin extends Plugin {
 	tabManager: TabManager;
 
 	async onload(): Promise<void> {
-		console.log("[AutoCloseTabs] Plugin loading...");
+		console.debug("[AutoCloseTabs] Plugin loading...");
 		await this.loadSettings();
-		console.log("[AutoCloseTabs] Settings loaded:", this.settings);
+		console.debug("[AutoCloseTabs] Settings loaded:", this.settings);
 
 		this.tabManager = new TabManager(this);
 		await this.tabManager.historyManager.loadHistory();
@@ -22,8 +22,8 @@ export default class AutoCloseTabsPlugin extends Plugin {
 		this.addCommand({
 			id: "check-inactive-tabs",
 			name: "Check for inactive tabs now",
-			callback: () => {
-				this.tabManager.manualCheck();
+			callback: async () => {
+				await this.tabManager.manualCheck();
 			},
 		});
 
@@ -49,13 +49,13 @@ export default class AutoCloseTabsPlugin extends Plugin {
 		this.addCommand({
 			id: "export-history-console",
 			name: "Export history to console",
-			callback: async () => {
-				const history = await this.tabManager.historyManager.exportHistory();
-				console.log(history);
+			callback: () => {
+				const history = this.tabManager.historyManager.exportHistory();
+				console.debug(history);
 			},
 		});
 
-		console.log("[AutoCloseTabs] Plugin loaded successfully");
+		console.debug("[AutoCloseTabs] Plugin loaded successfully");
 	}
 
 	onunload(): void {
@@ -74,4 +74,3 @@ export default class AutoCloseTabsPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 }
-

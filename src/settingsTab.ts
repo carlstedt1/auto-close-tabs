@@ -15,12 +15,6 @@ export class AutoCloseTabsSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		// Auto Close Tabs section heading (larger)
-		const mainHeading = new Setting(containerEl)
-			.setName("Auto Close Tabs")
-			.setHeading();
-		mainHeading.settingEl.addClass("auto-close-tabs-main-heading");
-
 		new Setting(containerEl)
 			.setName("Enable auto-close")
 			.setDesc("Automatically close inactive tabs after the specified timeout")
@@ -73,7 +67,7 @@ export class AutoCloseTabsSettingTab extends PluginSettingTab {
 
 		// History Logging section with proper heading
 		new Setting(containerEl)
-			.setName("History Logging")
+			.setName("History")
 			.setHeading();
 
 		new Setting(containerEl)
@@ -145,4 +139,3 @@ export class AutoCloseTabsSettingTab extends PluginSettingTab {
 			});
 	}
 }
-

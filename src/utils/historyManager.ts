@@ -1,20 +1,26 @@
-import { App, Modal, Notice, normalizePath, TFile, TFolder } from "obsidian";
+import { App, Modal, Notice, Plugin, normalizePath, TFile, TFolder } from "obsidian";
 import type { AutoCloseTabsSettings, ClosedTabEntry } from "../settings";
 import { DEFAULT_SETTINGS } from "../settings";
 
+interface PluginWithSettings extends Plugin {
+	settings: AutoCloseTabsSettings;
+	loadData(): Promise<{ closedTabsHistory?: ClosedTabEntry[] } | null>;
+	saveData(data: Record<string, unknown>): Promise<void>;
+}
+
 export class HistoryManager {
-	private plugin: any; // PluginWithSettings
+	private plugin: PluginWithSettings;
 	private history: ClosedTabEntry[] = [];
 
-	constructor(plugin: any) {
+	constructor(plugin: PluginWithSettings) {
 		this.plugin = plugin;
 	}
 
 	async loadHistory(): Promise<void> {
 		const data = await this.plugin.loadData();
-		if (data && data.closedTabsHistory) {
+		if (data?.closedTabsHistory && Array.isArray(data.closedTabsHistory)) {
 			this.history = data.closedTabsHistory;
-			console.log(`[AutoCloseTabs] Loaded ${this.history.length} history entries`);
+			console.debug(`[AutoCloseTabs] Loaded ${this.history.length} history entries`);
 		}
 	}
 
@@ -29,8 +35,10 @@ export class HistoryManager {
 			this.history = this.history.slice(-settings.maxHistoryEntries);
 		}
 
+		const existingData = (await this.plugin.loadData()) ?? {};
+
 		await this.plugin.saveData({
-			...await this.plugin.loadData(),
+			...existingData,
 			closedTabsHistory: this.history,
 		});
 	}
@@ -60,7 +68,8 @@ export class HistoryManager {
 		try {
 			const settings = this.plugin.settings;
 			const filePath = normalizePath(settings.logFilePath || DEFAULT_SETTINGS.logFilePath);
-			let file = this.plugin.app.vault.getAbstractFileByPath(filePath) as TFile | null;
+			const existing = this.plugin.app.vault.getAbstractFileByPath(filePath);
+			let file = existing instanceof TFile ? existing : null;
 
 			const timestamp = new Date(entry.timestamp).toLocaleString();
 			const line = `- \`${timestamp}\` - **${entry.fileName}** (inactive for ${entry.inactiveTimeMinutes.toFixed(1)} minutes)${entry.filePath ? ` - \`${entry.filePath}\`` : ""}\n`;
@@ -78,10 +87,10 @@ export class HistoryManager {
 						// Folder doesn't exist, create it
 						try {
 							await this.plugin.app.vault.createFolder(folderPath);
-							console.log(`[AutoCloseTabs] Created folder: ${folderPath}`);
-						} catch (folderError: any) {
+							console.debug(`[AutoCloseTabs] Created folder: ${folderPath}`);
+						} catch (folderError: unknown) {
 							// If folder creation fails (e.g., already exists), continue
-							if (!folderError.message?.includes("already exists")) {
+							if (!(folderError instanceof Error) || !folderError.message.includes("already exists")) {
 								console.error("[AutoCloseTabs] Error creating folder:", folderError);
 							}
 						}
@@ -92,12 +101,13 @@ export class HistoryManager {
 				const content = `# Auto-Close Tabs Log\n\nThis file logs tabs that have been automatically closed by the Auto Close Tabs plugin.\n\n---\n\n${line}`;
 				try {
 					file = await this.plugin.app.vault.create(filePath, content);
-					console.log(`[AutoCloseTabs] Created log file: ${filePath}`);
-				} catch (createError: any) {
+					console.debug(`[AutoCloseTabs] Created log file: ${filePath}`);
+				} catch (createError: unknown) {
 					// If file already exists (race condition), try to append instead
-					if (createError.message?.includes("already exists")) {
-						file = this.plugin.app.vault.getAbstractFileByPath(filePath) as TFile;
-						if (file) {
+					if (createError instanceof Error && createError.message.includes("already exists")) {
+						const existingFile = this.plugin.app.vault.getAbstractFileByPath(filePath);
+						if (existingFile instanceof TFile) {
+							file = existingFile;
 							await this.plugin.app.vault.append(file, line);
 						}
 					} else {
@@ -118,7 +128,7 @@ export class HistoryManager {
 		this.history = [];
 	}
 
-	async exportHistory(): Promise<string> {
+	exportHistory(): string {
 		if (this.history.length === 0) {
 			return "No closed tabs history.";
 		}
@@ -129,7 +139,7 @@ export class HistoryManager {
 
 		// Group by date
 		const grouped: Record<string, ClosedTabEntry[]> = {};
-		for (const entry of this.history.reverse()) {
+		for (const entry of [...this.history].reverse()) {
 			const date = new Date(entry.timestamp).toLocaleDateString();
 			if (!grouped[date]) {
 				grouped[date] = [];
@@ -155,6 +165,37 @@ export class HistoryManager {
 	}
 
 	showHistoryModal(): void {
+		class ConfirmClearHistoryModal extends Modal {
+			private onConfirm: () => Promise<void>;
+
+			constructor(app: App, onConfirm: () => Promise<void>) {
+				super(app);
+				this.onConfirm = onConfirm;
+			}
+
+			onOpen(): void {
+				const { contentEl } = this;
+				contentEl.empty();
+
+				contentEl.createEl("h3", { text: "Clear history?" }).addClass("act-history-title");
+				contentEl.createEl("p", { text: "This will remove all saved closed tab entries." }).addClass("act-history-muted");
+
+				const buttons = contentEl.createDiv({ cls: "act-history-button-row" });
+				const cancelBtn = buttons.createEl("button", { text: "Cancel" });
+				cancelBtn.onclick = () => this.close();
+
+				const confirmBtn = buttons.createEl("button", { text: "Clear history", cls: "mod-warning" });
+				confirmBtn.onclick = async () => {
+					await this.onConfirm();
+					this.close();
+				};
+			}
+
+			onClose(): void {
+				this.contentEl.empty();
+			}
+		}
+
 		class HistoryModal extends Modal {
 			private historyManager: HistoryManager;
 
@@ -167,30 +208,20 @@ export class HistoryManager {
 				const { contentEl } = this;
 				contentEl.empty();
 				
-				const title = contentEl.createEl("h2", { text: "Auto-Close Tabs History" });
-				title.style.marginBottom = "1em";
+				contentEl.createEl("h2", { text: "Auto-close tabs history" }).addClass("act-history-title");
 
 				const history = this.historyManager.getHistory();
 				if (history.length === 0) {
-					const emptyMsg = contentEl.createEl("p", { text: "No closed tabs history yet." });
-					emptyMsg.style.textAlign = "center";
-					emptyMsg.style.padding = "2em";
-					emptyMsg.style.color = "var(--text-muted)";
+					contentEl.createEl("p", { text: "No closed tabs history yet." }).addClass("act-history-empty");
 					return;
 				}
 
 				const countEl = contentEl.createEl("p", {
 					text: `Total entries: ${history.length}`,
 				});
-				countEl.style.marginBottom = "1em";
-				countEl.style.fontWeight = "bold";
+				countEl.addClass("act-history-count");
 
-				const container = contentEl.createDiv();
-				container.style.maxHeight = "60vh";
-				container.style.overflowY = "auto";
-				container.style.padding = "0.5em";
-				container.style.border = "1px solid var(--background-modifier-border)";
-				container.style.borderRadius = "4px";
+				const container = contentEl.createDiv({ cls: "act-history-scroll" });
 
 				// Group by date
 				const grouped: Record<string, ClosedTabEntry[]> = {};
@@ -209,54 +240,49 @@ export class HistoryManager {
 
 				for (const date of dates) {
 					const dateHeader = container.createEl("h3", { text: date });
-					dateHeader.style.marginTop = "1em";
-					dateHeader.style.marginBottom = "0.5em";
-					dateHeader.style.fontSize = "1.1em";
+					dateHeader.addClass("act-history-date");
 
 					const list = container.createEl("ul");
-					list.style.listStyle = "disc";
-					list.style.paddingLeft = "1.5em";
+					list.addClass("act-history-list");
 					
 					for (const entry of grouped[date]) {
 						const time = new Date(entry.timestamp).toLocaleTimeString();
 						const item = list.createEl("li");
-						item.style.marginBottom = "0.5em";
+						item.addClass("act-history-item");
 						
 						const timeSpan = item.createSpan({ text: `${time} - ` });
-						timeSpan.style.color = "var(--text-muted)";
+						timeSpan.addClass("act-history-muted");
 						
 						const fileNameEl = item.createEl("strong", { text: entry.fileName });
-						fileNameEl.style.color = "var(--text-normal)";
+						fileNameEl.addClass("act-history-file");
 						
 						const inactiveSpan = item.createSpan({
 							text: ` (inactive for ${entry.inactiveTimeMinutes.toFixed(1)} minutes)`,
 						});
-						inactiveSpan.style.color = "var(--text-muted)";
+						inactiveSpan.addClass("act-history-muted");
 						
 						if (entry.filePath) {
 							const pathEl = item.createEl("code", { text: ` - ${entry.filePath}` });
-							pathEl.style.marginLeft = "0.5em";
-							pathEl.style.fontSize = "0.9em";
+							pathEl.addClass("act-history-path");
 						}
 					}
 				}
 
 				// Add clear button
-				const buttonContainer = contentEl.createDiv();
-				buttonContainer.style.marginTop = "1em";
-				buttonContainer.style.textAlign = "center";
+				const buttonContainer = contentEl.createDiv({ cls: "act-history-button-row" });
 				
 				const clearButton = buttonContainer.createEl("button", {
-					text: "Clear History",
+					text: "Clear history",
 					cls: "mod-warning",
 				});
 				clearButton.onclick = async () => {
-					if (confirm("Are you sure you want to clear the history?")) {
+					const confirmModal = new ConfirmClearHistoryModal(this.app, async () => {
 						this.historyManager.clearHistory();
 						await this.historyManager.saveHistory();
 						new Notice("History cleared");
 						this.close();
-					}
+					});
+					confirmModal.open();
 				};
 			}
 
@@ -269,11 +295,10 @@ export class HistoryManager {
 		try {
 			const modal = new HistoryModal(this.plugin.app, this);
 			modal.open();
-			console.log("[AutoCloseTabs] History modal opened");
+			console.debug("[AutoCloseTabs] History modal opened");
 		} catch (error) {
 			console.error("[AutoCloseTabs] Error opening history modal:", error);
 			new Notice("Error opening history modal. Check console for details.");
 		}
 	}
 }
-

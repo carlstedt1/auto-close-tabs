@@ -1,4 +1,4 @@
-import { Plugin, WorkspaceLeaf } from "obsidian";
+import { MarkdownView, Plugin, TFile, WorkspaceLeaf } from "obsidian";
 import type { AutoCloseTabsSettings } from "../settings";
 import { HistoryManager } from "./historyManager";
 
@@ -18,7 +18,7 @@ export class TabManager {
 	}
 
 	start(): void {
-		console.log("[AutoCloseTabs] Starting tab manager");
+		console.debug("[AutoCloseTabs] Starting tab manager");
 		this.initializeLeafTracking();
 		this.registerActiveLeafChangeListener();
 		this.startPeriodicCheck();
@@ -42,7 +42,7 @@ export class TabManager {
 				leafCount++;
 			}
 		});
-		console.log(`[AutoCloseTabs] Initialized tracking for ${leafCount} root leaves (main workspace tabs only)`);
+		console.debug(`[AutoCloseTabs] Initialized tracking for ${leafCount} root leaves (main workspace tabs only)`);
 	}
 
 	private registerActiveLeafChangeListener(): void {
@@ -51,10 +51,10 @@ export class TabManager {
 			this.plugin.app.workspace.on("active-leaf-change", (leaf) => {
 				if (leaf && this.isRootLeaf(leaf)) {
 					const viewState = leaf.getViewState();
-					const file = (leaf.view as any)?.file;
+					const file = this.getLeafFile(leaf);
 					const fileName = file?.name || viewState.type;
 					this.leafActivityMap.set(leaf, Date.now());
-					console.log(`[AutoCloseTabs] Active root leaf changed: ${fileName} (pinned: ${viewState.pinned})`);
+					console.debug(`[AutoCloseTabs] Active root leaf changed: ${fileName} (pinned: ${viewState.pinned})`);
 				}
 			})
 		);
@@ -62,13 +62,13 @@ export class TabManager {
 		// Also track when files are opened (only for root leaves)
 		this.plugin.registerEvent(
 			this.plugin.app.workspace.on("file-open", (file) => {
-				if (file && this.plugin.app.workspace.activeLeaf) {
-					const leaf = this.plugin.app.workspace.activeLeaf;
-					if (this.isRootLeaf(leaf)) {
+				if (file) {
+					const leaf = this.getActiveRootLeaf();
+					if (leaf) {
 						const viewState = leaf.getViewState();
 						const fileName = file.name;
 						this.leafActivityMap.set(leaf, Date.now());
-						console.log(`[AutoCloseTabs] File opened in root leaf: ${fileName} (pinned: ${viewState.pinned})`);
+						console.debug(`[AutoCloseTabs] File opened in root leaf: ${fileName} (pinned: ${viewState.pinned})`);
 					}
 				}
 			})
@@ -82,41 +82,44 @@ export class TabManager {
 		try {
 			const root = this.plugin.app.workspace.rootSplit;
 			if (!root) return false;
-
-			// Check if the leaf's container is in the root split
-			const container = leaf.getContainer();
-			if (!container) return false;
-
-			// Walk up the parent chain to see if we're under rootSplit
-			let current: any = container;
-			while (current) {
-				if (current === root) {
-					return true;
-				}
-				// Check if we've hit a sidebar split - if so, this is not a root leaf
-				if (current === this.plugin.app.workspace.leftSplit || current === this.plugin.app.workspace.rightSplit) {
-					return false;
-				}
-				current = current.parent;
-			}
-			return false;
+			return leaf.getRoot() === root;
 		} catch (e) {
 			console.error("[AutoCloseTabs] Error checking if leaf is root:", e);
 			return false;
 		}
 	}
 
+	private getActiveRootLeaf(): WorkspaceLeaf | null {
+		const leaf = this.plugin.app.workspace.getMostRecentLeaf();
+		if (leaf && this.isRootLeaf(leaf)) {
+			return leaf;
+		}
+		return null;
+	}
+
+	private getLeafFile(leaf?: WorkspaceLeaf | null): TFile | null {
+		if (!leaf) {
+			return null;
+		}
+		const view = leaf.view;
+		if (view instanceof MarkdownView) {
+			return view.file;
+		}
+		const fileCandidate = (view as { file?: unknown }).file;
+		return fileCandidate instanceof TFile ? fileCandidate : null;
+	}
+
 	private startPeriodicCheck(): void {
 		const settings = this.plugin.settings;
 		if (!settings.enabled) {
-			console.log("[AutoCloseTabs] Plugin is disabled, not starting periodic check");
+			console.debug("[AutoCloseTabs] Plugin is disabled, not starting periodic check");
 			return;
 		}
 
 		const checkIntervalMs = settings.checkIntervalSeconds * 1000;
 		const inactiveTimeoutMs = settings.inactiveTimeoutMinutes * 60 * 1000;
 
-		console.log(
+		console.debug(
 			`[AutoCloseTabs] Starting periodic check: interval=${checkIntervalMs}ms, timeout=${inactiveTimeoutMs}ms (${settings.inactiveTimeoutMinutes} min)`
 		);
 
@@ -127,7 +130,7 @@ export class TabManager {
 		}, checkIntervalMs);
 
 		this.checkInterval = this.plugin.registerInterval(intervalId);
-		console.log(`[AutoCloseTabs] Periodic check interval registered: ${this.checkInterval}`);
+		console.debug(`[AutoCloseTabs] Periodic check interval registered: ${this.checkInterval}`);
 	}
 
 	private async checkAndCloseInactiveTabs(inactiveTimeoutMs: number): Promise<void> {
@@ -137,12 +140,12 @@ export class TabManager {
 		}
 
 		const now = Date.now();
-		const activeLeaf = this.plugin.app.workspace.activeLeaf;
+		const activeLeaf = this.getActiveRootLeaf();
 		const activeViewState = activeLeaf?.getViewState();
-		const activeFile = (activeLeaf?.view as any)?.file;
+		const activeFile = this.getLeafFile(activeLeaf);
 		const activeFileName = activeFile?.name || activeViewState?.type || "none";
 
-		console.log(`[AutoCloseTabs] Checking for inactive tabs (active: ${activeFileName})`);
+		console.debug(`[AutoCloseTabs] Checking for inactive tabs (active: ${activeFileName})`);
 
 		const leavesToClose: Array<{ leaf: WorkspaceLeaf; inactiveTime: number; fileName: string }> = [];
 		let totalLeaves = 0;
@@ -153,27 +156,27 @@ export class TabManager {
 		this.plugin.app.workspace.iterateRootLeaves((leaf) => {
 			totalLeaves++;
 			const viewState = leaf.getViewState();
-			const file = (leaf.view as any)?.file;
+			const file = this.getLeafFile(leaf);
 			const fileName = file?.name || viewState.type || "unknown";
 
 			// Skip pinned tabs
 			if (viewState.pinned) {
 				pinnedCount++;
-				console.log(`[AutoCloseTabs]   - Skipping pinned tab: ${fileName}`);
+				console.debug(`[AutoCloseTabs]   - Skipping pinned tab: ${fileName}`);
 				return;
 			}
 
 			// Skip currently active leaf
 			if (leaf === activeLeaf) {
 				activeCount++;
-				console.log(`[AutoCloseTabs]   - Skipping active tab: ${fileName}`);
+				console.debug(`[AutoCloseTabs]   - Skipping active tab: ${fileName}`);
 				return;
 			}
 
 			// Get last activity time, default to now if not tracked
 			const lastActivity = this.leafActivityMap.get(leaf);
 			if (!lastActivity) {
-				console.log(`[AutoCloseTabs]   - Warning: No activity record for ${fileName}, using current time`);
+				console.debug(`[AutoCloseTabs]   - Warning: No activity record for ${fileName}, using current time`);
 				this.leafActivityMap.set(leaf, now);
 				return;
 			}
@@ -182,7 +185,7 @@ export class TabManager {
 			const inactiveMinutes = Math.floor(inactiveTime / 60000);
 			const inactiveSeconds = Math.floor((inactiveTime % 60000) / 1000);
 
-			console.log(
+			console.debug(
 				`[AutoCloseTabs]   - Tab: ${fileName}, inactive: ${inactiveMinutes}m ${inactiveSeconds}s (threshold: ${inactiveTimeoutMs / 60000} min)`
 			);
 
@@ -191,7 +194,7 @@ export class TabManager {
 			}
 		});
 
-		console.log(
+		console.debug(
 			`[AutoCloseTabs] Summary: ${totalLeaves} total, ${pinnedCount} pinned, ${activeCount} active, ${leavesToClose.length} to close`
 		);
 
@@ -199,10 +202,10 @@ export class TabManager {
 		for (const { leaf, inactiveTime, fileName } of leavesToClose) {
 			const inactiveMinutes = Math.floor(inactiveTime / 60000);
 			const inactiveTimeMinutes = inactiveTime / 60000;
-			console.log(`[AutoCloseTabs] Closing inactive tab: ${fileName} (inactive for ${inactiveMinutes} minutes)`);
+			console.debug(`[AutoCloseTabs] Closing inactive tab: ${fileName} (inactive for ${inactiveMinutes} minutes)`);
 			
 			// Log to history
-			const file = (leaf.view as any)?.file;
+			const file = this.getLeafFile(leaf);
 			const filePath = file?.path;
 			await this.historyManager.addEntry({
 				timestamp: Date.now(),
@@ -215,12 +218,12 @@ export class TabManager {
 		}
 
 		if (leavesToClose.length > 0) {
-			console.log(`[AutoCloseTabs] Closed ${leavesToClose.length} inactive tab(s)`);
+			console.debug(`[AutoCloseTabs] Closed ${leavesToClose.length} inactive tab(s)`);
 		}
 	}
 
 	updateSettings(): void {
-		console.log("[AutoCloseTabs] Updating settings, restarting tab manager");
+		console.debug("[AutoCloseTabs] Updating settings, restarting tab manager");
 		this.stop();
 		this.start();
 	}
@@ -228,23 +231,23 @@ export class TabManager {
 	async manualCheck(): Promise<void> {
 		const settings = this.plugin.settings;
 		if (!settings.enabled) {
-			console.log("[AutoCloseTabs] Plugin is disabled, cannot check");
+			console.debug("[AutoCloseTabs] Plugin is disabled, cannot check");
 			return;
 		}
 		const inactiveTimeoutMs = settings.inactiveTimeoutMinutes * 60 * 1000;
-		console.log("[AutoCloseTabs] Manual check triggered");
+		console.debug("[AutoCloseTabs] Manual check triggered");
 		await this.checkAndCloseInactiveTabs(inactiveTimeoutMs);
 	}
 
 	showStatus(): void {
 		const now = Date.now();
-		const activeLeaf = this.plugin.app.workspace.activeLeaf;
+		const activeLeaf = this.getActiveRootLeaf();
 		const settings = this.plugin.settings;
 		const inactiveTimeoutMs = settings.inactiveTimeoutMinutes * 60 * 1000;
 
-		console.log("=== [AutoCloseTabs] Tab Status ===");
-		console.log(`Settings: enabled=${settings.enabled}, timeout=${settings.inactiveTimeoutMinutes} min, check interval=${settings.checkIntervalSeconds} s`);
-		console.log(`Current time: ${new Date(now).toLocaleTimeString()}`);
+		console.debug("=== [AutoCloseTabs] Tab Status ===");
+		console.debug(`Settings: enabled=${settings.enabled}, timeout=${settings.inactiveTimeoutMinutes} min, check interval=${settings.checkIntervalSeconds} s`);
+		console.debug(`Current time: ${new Date(now).toLocaleTimeString()}`);
 
 		let totalLeaves = 0;
 		const statusList: Array<{
@@ -260,7 +263,7 @@ export class TabManager {
 		this.plugin.app.workspace.iterateRootLeaves((leaf) => {
 			totalLeaves++;
 			const viewState = leaf.getViewState();
-			const file = (leaf.view as any)?.file;
+			const file = this.getLeafFile(leaf);
 			const fileName = file?.name || viewState.type || "unknown";
 			const isActive = leaf === activeLeaf;
 			const isPinned = viewState.pinned || false;
@@ -278,7 +281,7 @@ export class TabManager {
 			});
 		});
 
-		console.log(`Total leaves: ${totalLeaves}`);
+		console.debug(`Total leaves: ${totalLeaves}`);
 		for (const status of statusList) {
 			const inactiveMinutes = Math.floor(status.inactiveTime / 60000);
 			const inactiveSeconds = Math.floor((status.inactiveTime % 60000) / 1000);
@@ -291,11 +294,10 @@ export class TabManager {
 				.filter(Boolean)
 				.join(", ");
 
-			console.log(
+			console.debug(
 				`  - ${status.fileName}: inactive ${inactiveMinutes}m ${inactiveSeconds}s (last: ${lastActivityDate}) ${flags ? `[${flags}]` : ""}`
 			);
 		}
-		console.log("=== End Status ===");
+		console.debug("=== End Status ===");
 	}
 }
-
