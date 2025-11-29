@@ -44,15 +44,15 @@ Alternatively, for manual installation:
 
 ## ⚙️ Settings
 
-| Setting | Default | Description |
-| :--- | :--- | :--- |
-| **Enable auto-close** | On | Toggle the entire plugin on or off. |
-| **Inactive timeout** | 1440 min (1 day) | How many minutes a tab must be inactive before closing. |
-| **Check interval** | 60 sec | How often the plugin checks for inactive tabs. |
-| **Enable history logging** | On | Track closed tabs in an internal log. |
-| **Max history entries** | 1000 | Limit how many entries are kept in history. |
-| **Write to file** | Off | Also append closed tab logs to a specific markdown file. |
-| **Log file path** | `system/...` | The path to the log file (if "Write to file" is on). |
+| Setting                    | Default          | Description                                              |
+| :------------------------- | :--------------- | :------------------------------------------------------- |
+| **Enable auto-close**      | On               | Toggle the entire plugin on or off.                      |
+| **Inactive timeout**       | 1440 min (1 day) | How many minutes a tab must be inactive before closing.  |
+| **Check interval**         | 60 sec           | How often the plugin checks for inactive tabs.           |
+| **Enable history logging** | On               | Track closed tabs in an internal log.                    |
+| **Max history entries**    | 1000             | Limit how many entries are kept in history.              |
+| **Write to file**          | Off              | Also append closed tab logs to a specific markdown file. |
+| **Log file path**          | `system/...`     | The path to the log file (if "Write to file" is on).     |
 
 ## 🪲 Troubleshooting
 
