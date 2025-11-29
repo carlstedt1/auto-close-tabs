@@ -64,3 +64,48 @@ If your plugin does not need CSS, delete this file.
 	gap: 0.75em;
 	justify-content: center;
 }
+
+.act-status-title {
+	margin: 0 0 0.75em 0;
+}
+
+.act-status-count {
+	margin: 0 0 0.75em 0;
+	font-weight: 600;
+}
+
+.act-status-list {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5em;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	padding: 0.75em;
+	max-height: 60vh;
+	overflow-y: auto;
+}
+
+.act-status-row {
+	display: flex;
+	flex-direction: column;
+	gap: 0.2em;
+	padding: 0.35em 0.4em;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.act-status-row:last-child {
+	border-bottom: none;
+}
+
+.act-status-file {
+	font-weight: 600;
+}
+
+.act-status-meta {
+	color: var(--text-muted);
+}
+
+.act-status-hint {
+	margin-top: 0.75em;
+	color: var(--text-muted);
+}
