@@ -2,7 +2,7 @@
 
 Automatically close inactive tabs after a configurable period. Keep your workspace clean by treating unpinned tabs as "fleeting", inspired by the Fleeting Tabs feature in the Arc browser.
 
-**Current version: 1.0.0**
+**Current version: 1.0.1**
 
 ## ✨ Features
 
