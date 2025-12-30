@@ -275,7 +275,7 @@ export class HistoryManager {
 					text: "Clear history",
 					cls: "mod-warning",
 				});
-				clearButton.onclick = async () => {
+				clearButton.onclick = () => {
 					const confirmModal = new ConfirmClearHistoryModal(this.app, async () => {
 						this.historyManager.clearHistory();
 						await this.historyManager.saveHistory();

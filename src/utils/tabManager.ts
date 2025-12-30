@@ -254,11 +254,11 @@ export class TabManager {
 		console.debug("[AutoCloseTabs] Manual check triggered");
 		const closed = await this.checkAndCloseInactiveTabsWithResult(inactiveTimeoutMs);
 		if (closed.length === 0) {
-			new Notice("Auto Close Tabs: no inactive tabs to close.");
+			new Notice("Auto close tabs: No inactive tabs to close.");
 			return;
 		}
 		const names = closed.map((c) => `${c.fileName} (${c.inactiveMinutes}m)`).join(", ");
-		new Notice(`Auto Close Tabs: closed ${closed.length} tab(s): ${names}`);
+		new Notice(`Auto close tabs: Closed ${closed.length} tab(s): ${names}`);
 	}
 
 	showStatus(): void {
